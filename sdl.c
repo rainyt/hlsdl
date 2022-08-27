@@ -1,10 +1,13 @@
 #define HL_NAME(n) sdl_##n
 
 #include <hl.h>
+#include <locale.h>
 
-#if defined(_WIN32) || defined(__ANDROID__)
+#if defined(_WIN32) || defined(__ANDROID__) || defined(HL_IOS) || defined(HL_TVOS)
 #	include <SDL.h>
 #	include <SDL_syswm.h>
+#elif defined(HL_MAC)
+#	include <SDL.h>
 #else
 #	include <SDL2/SDL.h>
 #endif
@@ -12,12 +15,14 @@
 #if defined (HL_IOS) || defined(HL_TVOS)
 #	include <OpenGLES/ES3/gl.h>
 #	include <OpenGLES/ES3/glext.h>
-#	include <SDL2/SDL_syswm.h>
 #endif
 
 #ifndef SDL_MAJOR_VERSION
 #	error "SDL2 SDK not found in hl/include/sdl/"
 #endif
+
+#define TWIN _ABSTRACT(sdl_window)
+#define TGL _ABSTRACT(sdl_gl)
 
 typedef struct {
 	int x;
@@ -88,6 +93,7 @@ typedef struct {
 	int value;
 	int fingerId;
 	int joystick;
+	const char* inputChar;
 } event_data;
 
 HL_PRIM bool HL_NAME(init_once)() {
@@ -96,6 +102,7 @@ HL_PRIM bool HL_NAME(init_once)() {
 		hl_error("SDL_Init failed: %s", hl_to_utf16(SDL_GetError()));
 		return false;
 	}
+	setlocale(LC_ALL, "C");
 #	ifdef _WIN32
 	// Set the internal windows timer period to 1ms (will give accurate sleep for vsync)
 	timeBeginPeriod(1);
@@ -184,20 +191,20 @@ HL_PRIM bool HL_NAME(event_loop)( event_data *event ) {
 			break;
 		case SDL_FINGERDOWN:
 			event->type = TouchDown;
-			event->mouseX = (int)(e.tfinger.x*100);
-			event->mouseY = (int)(e.tfinger.y*100);
+			event->mouseX = (int)(e.tfinger.x*10000);
+			event->mouseY = (int)(e.tfinger.y*10000);
 			event->fingerId = (int)e.tfinger.fingerId;
 			break;
 		case SDL_FINGERMOTION:
 			event->type = TouchMove;
-			event->mouseX = (int)(e.tfinger.x*100);
-			event->mouseY = (int)(e.tfinger.y*100);
+			event->mouseX = (int)(e.tfinger.x*10000);
+			event->mouseY = (int)(e.tfinger.y*10000);
 			event->fingerId = (int)e.tfinger.fingerId;
 			break;
 		case SDL_FINGERUP:
 			event->type = TouchUp;
-			event->mouseX = (int)(e.tfinger.x*100);
-			event->mouseY = (int)(e.tfinger.y*100);
+			event->mouseX = (int)(e.tfinger.x*10000);
+			event->mouseY = (int)(e.tfinger.y*10000);
 			event->fingerId = (int)e.tfinger.fingerId;
 			break;
 		case SDL_MOUSEWHEEL:
@@ -224,7 +231,7 @@ HL_PRIM bool HL_NAME(event_loop)( event_data *event ) {
 			case SDL_WINDOWEVENT_MOVED:
 				event->state = Move;
 				break;
-			case SDL_WINDOWEVENT_RESIZED:
+			case SDL_WINDOWEVENT_SIZE_CHANGED:
 				event->state = Resize;
 				break;
 			case SDL_WINDOWEVENT_MINIMIZED:
@@ -359,6 +366,23 @@ HL_PRIM int HL_NAME(get_screen_height)() {
 	return e.h;
 }
 
+HL_PRIM int HL_NAME(get_screen_width_of_window)(SDL_Window* win) {
+	SDL_DisplayMode e;
+	SDL_GetCurrentDisplayMode(win != NULL ? SDL_GetWindowDisplayIndex(win) : 0, &e);
+	return e.w;
+}
+
+HL_PRIM int HL_NAME(get_screen_height_of_window)(SDL_Window* win) {
+	SDL_DisplayMode e;
+	SDL_GetCurrentDisplayMode(win != NULL ? SDL_GetWindowDisplayIndex(win) : 0, &e);
+	return e.h;
+}
+
+HL_PRIM int HL_NAME(get_framerate)(SDL_Window* win) {
+	SDL_DisplayMode e;
+	SDL_GetCurrentDisplayMode(win != NULL ? SDL_GetWindowDisplayIndex(win) : 0, &e);
+	return e.refresh_rate;
+}
 
 HL_PRIM void HL_NAME(message_box)(vbyte *title, vbyte *text, bool error) {
 	hl_blocking(true);
@@ -409,6 +433,9 @@ DEFINE_PRIM(_VOID, quit, _NO_ARG);
 DEFINE_PRIM(_VOID, delay, _I32);
 DEFINE_PRIM(_I32, get_screen_width, _NO_ARG);
 DEFINE_PRIM(_I32, get_screen_height, _NO_ARG);
+DEFINE_PRIM(_I32, get_screen_width_of_window, TWIN);
+DEFINE_PRIM(_I32, get_screen_height_of_window, TWIN);
+DEFINE_PRIM(_I32, get_framerate, TWIN);
 DEFINE_PRIM(_VOID, message_box, _BYTES _BYTES _BOOL);
 DEFINE_PRIM(_VOID, set_vsync, _BOOL);
 DEFINE_PRIM(_BOOL, detect_win32, _NO_ARG);
@@ -420,23 +447,22 @@ DEFINE_PRIM(_BOOL, hint_value, _BYTES _BYTES);
 // Window
 
 HL_PRIM SDL_Window *HL_NAME(win_create_ex)(int x, int y, int width, int height, int sdlFlags) {
-	SDL_Window *w;
 	// force window to match device resolution on mobile
 #ifdef	HL_MOBILE
 	SDL_DisplayMode displayMode;
 	SDL_GetDesktopDisplayMode(0, &displayMode);
-	w = SDL_CreateWindow("", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_BORDERLESS | sdlFlags);
+	SDL_Window* win = SDL_CreateWindow("", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_BORDERLESS | sdlFlags);
 #else
-	w = SDL_CreateWindow("", x, y, width, height, SDL_WINDOW_OPENGL | sdlFlags);
+	SDL_Window* win = SDL_CreateWindow("", x, y, width, height, SDL_WINDOW_OPENGL | sdlFlags);
 #endif
 #	ifdef HL_WIN
 	// force window to show even if the debugger force process windows to be hidden
-	if( (SDL_GetWindowFlags(w) & SDL_WINDOW_INPUT_FOCUS) == 0 ) {
-		SDL_HideWindow(w);
-		SDL_ShowWindow(w);
+	if( (SDL_GetWindowFlags(win) & SDL_WINDOW_INPUT_FOCUS) == 0 ) {
+		SDL_HideWindow(win);
+		SDL_ShowWindow(win);
 	}
 #	endif
-	return w;
+	return win;
 }
 
 HL_PRIM SDL_Window *HL_NAME(win_create)(int width, int height) {
@@ -459,6 +485,7 @@ HL_PRIM bool HL_NAME(win_set_fullscreen)(SDL_Window *win, int mode) {
 		// exit borderless
 		SetWindowLong(wnd,GWL_STYLE,save->style);
 		SetWindowPos(wnd,NULL,save->x,save->y,save->w,save->h,0);
+		SDL_SetWindowSize(win, save->w, save->h);
 		free(save);
 		SDL_SetWindowData(win,"save",NULL);
 		save = NULL;
@@ -468,7 +495,7 @@ HL_PRIM bool HL_NAME(win_set_fullscreen)(SDL_Window *win, int mode) {
 	case 0: // WINDOWED
 		return SDL_SetWindowFullscreen(win, 0) == 0;
 	case 1: // FULLSCREEN
-		return SDL_SetWindowFullscreen(win, SDL_WINDOW_FULLSCREEN_DESKTOP) == 0;
+		return SDL_SetWindowFullscreen(win, SDL_WINDOW_FULLSCREEN) == 0;
 	case 2: // BORDERLESS
 #		ifdef _WIN32
 		{
@@ -490,12 +517,27 @@ HL_PRIM bool HL_NAME(win_set_fullscreen)(SDL_Window *win, int mode) {
 			return true;
 		}
 #	else
-		break;
+		return SDL_SetWindowFullscreen(win, SDL_WINDOW_FULLSCREEN_DESKTOP) == 0;
 #	endif
-	case 3:
-		return SDL_SetWindowFullscreen(win, SDL_WINDOW_FULLSCREEN) == 0;
 	}
 	return false;
+}
+
+HL_PRIM bool HL_NAME(win_set_display_mode)(SDL_Window *win, int width, int height, int framerate) {
+	SDL_DisplayMode mode;
+	int display_idx = SDL_GetWindowDisplayIndex(win);
+	for (int i = 0; i < SDL_GetNumDisplayModes(display_idx); i++) {
+		if (SDL_GetDisplayMode(display_idx, i, &mode) == 0) {
+			if (mode.w == width && mode.h == height && mode.refresh_rate == framerate) {
+				return SDL_SetWindowDisplayMode(win, &mode) >= 0;
+			}
+		}
+	}
+	return false;
+ }
+
+HL_PRIM int HL_NAME(win_display_handle)(SDL_Window *win) {
+	return SDL_GetWindowDisplayIndex(win);
 }
 
 HL_PRIM void HL_NAME(win_set_title)(SDL_Window *win, vbyte *title) {
@@ -588,12 +630,12 @@ HL_PRIM void HL_NAME(win_destroy)(SDL_Window *win, SDL_GLContext gl) {
 	SDL_GL_DeleteContext(gl);
 }
 
-#define TWIN _ABSTRACT(sdl_window)
-#define TGL _ABSTRACT(sdl_gl)
 DEFINE_PRIM(TWIN, win_create_ex, _I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(TWIN, win_create, _I32 _I32);
 DEFINE_PRIM(TGL, win_get_glcontext, TWIN);
 DEFINE_PRIM(_BOOL, win_set_fullscreen, TWIN _I32);
+DEFINE_PRIM(_BOOL, win_set_display_mode, TWIN _I32 _I32 _I32);
+DEFINE_PRIM(_I32, win_display_handle, TWIN);
 DEFINE_PRIM(_VOID, win_resize, TWIN _I32);
 DEFINE_PRIM(_VOID, win_set_title, TWIN _BYTES);
 DEFINE_PRIM(_VOID, win_set_position, TWIN _I32 _I32);
@@ -757,6 +799,71 @@ HL_PRIM void HL_NAME(set_cursor)( SDL_Cursor *c ) {
 	SDL_SetCursor(c);
 }
 
+HL_PRIM bool HL_NAME(set_clipboard_text)(char* text) {
+	return SDL_SetClipboardText(text) == 0;
+}
+
+HL_PRIM char* HL_NAME(get_clipboard_text)() {
+	char* chr = SDL_GetClipboardText();
+	if (chr == NULL)
+		return NULL;
+	vbyte* bytes = hl_copy_bytes(chr, (int) strlen(chr) + 1);
+	SDL_free(chr);
+	return bytes;
+}
+
+HL_PRIM varray* HL_NAME(get_displays)() {
+	int n = SDL_GetNumVideoDisplays();
+	varray* arr = hl_alloc_array(&hlt_dynobj, n);
+	for (int i = 0; i < n; i++) {
+		vdynamic *obj = (vdynamic*) hl_alloc_dynobj();
+		SDL_Rect rect;
+		SDL_GetDisplayBounds(i, &rect);
+		hl_dyn_seti(obj, hl_hash_utf8("right"), &hlt_i32, rect.x+rect.w);
+		hl_dyn_seti(obj, hl_hash_utf8("bottom"), &hlt_i32, rect.y+rect.h);
+		hl_dyn_seti(obj, hl_hash_utf8("left"), &hlt_i32, rect.x);
+		hl_dyn_seti(obj, hl_hash_utf8("top"), &hlt_i32, rect.y);
+		hl_dyn_seti(obj, hl_hash_utf8("handle"), &hlt_i32, i);
+		const char *name = SDL_GetDisplayName(i);
+		hl_dyn_setp(obj, hl_hash_utf8("name"), &hlt_bytes, hl_copy_bytes(name, (int) strlen(name)+1));
+		hl_aptr(arr, vdynamic*)[i] = obj;
+	}
+	return arr;
+}
+
+HL_PRIM varray* HL_NAME(get_display_modes)(int display_id) {
+	int n = SDL_GetNumDisplayModes(display_id);
+	varray* arr = hl_alloc_array(&hlt_dynobj, n);
+	for (int i = 0; i < n; i++) {
+		SDL_DisplayMode mode;
+		SDL_GetDisplayMode(display_id, i, &mode);
+		vdynamic *obj = (vdynamic*)hl_alloc_dynobj();
+		hl_dyn_seti(obj, hl_hash_utf8("width"), &hlt_i32, mode.w);
+		hl_dyn_seti(obj, hl_hash_utf8("height"), &hlt_i32, mode.h);
+		hl_dyn_seti(obj, hl_hash_utf8("framerate"), &hlt_i32, mode.refresh_rate);
+		hl_aptr(arr, vdynamic*)[i] = obj;
+	}
+	return arr;
+}
+
+HL_PRIM vdynobj* HL_NAME(get_current_display_mode)(int display_id, bool registry) {
+	SDL_DisplayMode mode;
+	int r;
+	if(registry)
+		r = SDL_GetDesktopDisplayMode(display_id, &mode);
+	else
+		r = SDL_GetCurrentDisplayMode(display_id, &mode);
+	if (r < 0) {
+		printf("can't find mode for %d : %d\n", display_id, r);
+		return NULL;
+	}
+	vdynamic* obj = (vdynamic*)hl_alloc_dynobj();
+	hl_dyn_seti(obj, hl_hash_utf8("width"), &hlt_i32, mode.w);
+	hl_dyn_seti(obj, hl_hash_utf8("height"), &hlt_i32, mode.h);
+	hl_dyn_seti(obj, hl_hash_utf8("framerate"), &hlt_i32, mode.refresh_rate);
+	return (vdynobj*) obj;
+}
+
 #define MAX_DEVICES 16
 HL_PRIM varray *HL_NAME(get_devices)() {
 	varray *a = hl_alloc_array(&hlt_bytes, MAX_DEVICES);
@@ -779,4 +886,9 @@ DEFINE_PRIM(_CURSOR, cursor_create, _SURF _I32 _I32);
 DEFINE_PRIM(_CURSOR, cursor_create_system, _I32);
 DEFINE_PRIM(_VOID, free_cursor, _CURSOR);
 DEFINE_PRIM(_VOID, set_cursor, _CURSOR);
+DEFINE_PRIM(_BOOL, set_clipboard_text, _BYTES);
+DEFINE_PRIM(_BYTES, get_clipboard_text, _NO_ARG);
+DEFINE_PRIM(_ARR, get_displays, _NO_ARG);
+DEFINE_PRIM(_ARR, get_display_modes, _I32);
+DEFINE_PRIM(_DYN, get_current_display_mode, _I32 _BOOL);
 DEFINE_PRIM(_ARR, get_devices, _NO_ARG);
