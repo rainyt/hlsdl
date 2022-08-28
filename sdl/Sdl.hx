@@ -156,6 +156,14 @@ class Sdl {
 			return @:privateAccess String.fromUTF8(t);
 	}
 
+	/**
+	 * This is needed for software applications (and games) using SDL to interact with IME an appropriately. Without knowing if the IME is currently actively taking input from the user or displayed it's not possible for an application to handle certain input events from the mouse appropriately.
+	 * @return Bool
+	 */
+	public static function isTextInputShown():Bool{
+		return _isTextInputShown();
+	}
+
 	@:hlNative("?sdl", "get_screen_width")
 	static function get_screen_width() : Int {
 		return 0;
@@ -224,6 +232,11 @@ class Sdl {
 	@:hlNative("?sdl", "get_clipboard_text")
 	private static function _getClipboardText() : hl.Bytes {
 		return null;
+	}
+
+	@:hlNative("?sdl", "is_text_input_shown")
+	private static function _isTextInputShown() : Bool {
+		return false;
 	}
 }
 

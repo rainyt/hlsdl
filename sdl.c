@@ -814,6 +814,11 @@ HL_PRIM char* HL_NAME(get_clipboard_text)() {
 	return bytes;
 }
 
+// SDL2.0.22 support, Used to improve ime input.
+HL_PRIM bool HL_NAME(is_text_input_shown)(){
+	return SDL_IsTextInputShown();
+}
+
 HL_PRIM varray* HL_NAME(get_displays)() {
 	int n = SDL_GetNumVideoDisplays();
 	varray* arr = hl_alloc_array(&hlt_dynobj, n);
@@ -890,6 +895,7 @@ DEFINE_PRIM(_VOID, free_cursor, _CURSOR);
 DEFINE_PRIM(_VOID, set_cursor, _CURSOR);
 DEFINE_PRIM(_BOOL, set_clipboard_text, _BYTES);
 DEFINE_PRIM(_BYTES, get_clipboard_text, _NO_ARG);
+DEFINE_PRIM(_BOOL, is_text_input_shown, _NO_ARG);
 DEFINE_PRIM(_ARR, get_displays, _NO_ARG);
 DEFINE_PRIM(_ARR, get_display_modes, _I32);
 DEFINE_PRIM(_DYN, get_current_display_mode, _I32 _BOOL);
