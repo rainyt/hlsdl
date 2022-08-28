@@ -149,6 +149,8 @@ HL_PRIM bool HL_NAME(hint_value)( vbyte* name, vbyte* value) {
 	return SDL_SetHint((char*)name, (char*)value) == SDL_TRUE;
 }
 
+bool textediting = false;
+
 HL_PRIM bool HL_NAME(event_loop)( event_data *event ) {
 	while (true) {
 		SDL_Event e;
@@ -265,6 +267,7 @@ HL_PRIM bool HL_NAME(event_loop)( event_data *event ) {
 			break;
 		case SDL_TEXTEDITING:
 			// skip
+			textediting = true;
 			continue;
 		case SDL_TEXTINPUT:
 			event->type = TextInput;
@@ -816,6 +819,11 @@ HL_PRIM char* HL_NAME(get_clipboard_text)() {
 
 // SDL2.0.22 support, Used to improve ime input.
 HL_PRIM bool HL_NAME(is_text_input_shown)(){
+	if(textediting)
+	{
+		textediting = false;
+		return true;
+	}
 	return SDL_IsTextInputShown();
 }
 
