@@ -16,7 +16,6 @@ package sdl;
 	public var value : Int;
 	public var fingerId : Int;
 	public var joystick : Int;
-	public var inputChar : hl.Bytes;
 	public function new() {
 	}
 }

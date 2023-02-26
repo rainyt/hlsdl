@@ -112,7 +112,10 @@ class Sdl {
 	}
 	
 	public static function getDisplayModes(display : Window.DisplayHandle) : Array<ScreenMode> {
-		return [ for(m in get_display_modes(display)) m ];
+		var modes = get_display_modes(display);
+		if(modes == null)
+			return [];
+		return [ for(m in modes) m ];
 	}
 
 	public static function getCurrentDisplayMode(display : Window.DisplayHandle, registry : Bool = false) : ScreenMode {
@@ -120,6 +123,9 @@ class Sdl {
 	}
 
 	public static function getDisplays() : Array<Display> {
+		var displays = get_displays();
+		if(displays == null)
+			return [];
 		var i = 0;
 		return [ for(d in get_displays() ) @:privateAccess { handle: d.handle, name: '${String.fromUTF8(d.name)} (${++i})', left: d.left, top: d.top, right: d.right, bottom: d.bottom } ];
 	}
@@ -156,14 +162,6 @@ class Sdl {
 			return @:privateAccess String.fromUTF8(t);
 	}
 
-	/**
-	 * This is needed for software applications (and games) using SDL to interact with IME an appropriately. Without knowing if the IME is currently actively taking input from the user or displayed it's not possible for an application to handle certain input events from the mouse appropriately.
-	 * @return Bool
-	 */
-	public static function isTextInputShown():Bool{
-		return _isTextInputShown();
-	}
-
 	@:hlNative("?sdl", "get_screen_width")
 	static function get_screen_width() : Int {
 		return 0;
@@ -179,7 +177,7 @@ class Sdl {
 		return 0;
 	}
 
-	@:hlNative("?sdl", "get_screen_height_of_display")
+	@:hlNative("?sdl", "get_screen_height_of_window")
 	static function get_screen_height_of_window(win: sdl.Window.WinPtr) : Int {
 		return 0;
 	}
@@ -201,12 +199,6 @@ class Sdl {
 		return null;
 	}
 
-
-	@:hlNative("?sdl", "get_desktop_display_mode")
-	static function get_desktop_display_mode(displayId : Int) : Dynamic {
-		return null;
-	}
-
 	@:hlNative("?sdl", "get_displays")
 	static function get_displays() : hl.NativeArray<Dynamic> {
 		return null;
@@ -214,6 +206,14 @@ class Sdl {
 
 	static function get_devices() : hl.NativeArray<hl.Bytes> {
 		return null;
+	}
+
+	public static function getRelativeMouseMode() : Bool {
+		return false;
+	}
+	
+	public static function warpMouseGlobal( x : Int, y : Int ) : Int {
+		return 0;
 	}
 
 	static function detect_keyboard_layout() : hl.Bytes {
@@ -232,11 +232,6 @@ class Sdl {
 	@:hlNative("?sdl", "get_clipboard_text")
 	private static function _getClipboardText() : hl.Bytes {
 		return null;
-	}
-
-	@:hlNative("?sdl", "is_text_input_shown")
-	private static function _isTextInputShown() : Bool {
-		return false;
 	}
 }
 
