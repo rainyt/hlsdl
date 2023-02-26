@@ -64,7 +64,6 @@ class Window {
 	public var currentMonitor(get, default) : Int;
 	public var visible(default, set) : Bool = true;
 	public var opacity(get, set) : Float;
-	public var grab(get, set) : Bool;
 
 	public function new( title : String, width : Int, height : Int, x : Int = SDL_WINDOWPOS_CENTERED, y : Int = SDL_WINDOWPOS_CENTERED, sdlFlags : Int = SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE ) {
 		while( true ) {
@@ -178,10 +177,6 @@ class Window {
 		setPosition(SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
 	}
 
-	public function warpMouse( x : Int, y : Int ) {
-		warpMouseInWindow(win, x, y);
-	}
-
 	function get_width() {
 		var w = 0;
 		winGetSize(win, w, null);
@@ -245,15 +240,6 @@ class Window {
 
 	function set_opacity(v) {
 		winSetOpacity(win, v);
-		return v;
-	}
-	
-	function get_grab() {
-		return getWindowGrab(win);
-	}
-	
-	function set_grab(v) {
-		setWindowGrab(win, v);
 		return v;
 	}
 
@@ -369,15 +355,4 @@ class Window {
 
 	static function setVsync( b : Bool ) {
 	}
-
-	static function setWindowGrab( win : WinPtr, grab : Bool ) {
-	}
-	
-	static function getWindowGrab( win : WinPtr ) : Bool {
-		return false;
-	}
-	
-	static function warpMouseInWindow( win : WinPtr, x : Int, y : Int ) : Void {
-	}
-
 }
